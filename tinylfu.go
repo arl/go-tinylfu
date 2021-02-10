@@ -6,6 +6,7 @@ package tinylfu
 
 import (
 	"container/list"
+	"fmt"
 
 	"github.com/dgryski/go-metro"
 )
@@ -105,14 +106,18 @@ func (t *T) Add(key string, val interface{}) {
 		return
 	}
 
+	fmt.Println("Add / old item -> ", oitem.value)
+
 	// estimate count of what will be evicted from slru
 	victim := t.slru.victim()
 	if victim == nil {
+		fmt.Println("Add victim == nil / old item -> ", oitem.value)
 		t.slru.add(oitem)
 		return
 	}
 
 	if !t.bouncer.allow(oitem.keyh) {
+		fmt.Println("Add bouncer !allow / old item -> ", oitem.value)
 		return
 	}
 
@@ -120,10 +125,10 @@ func (t *T) Add(key string, val interface{}) {
 	ocount := t.c.estimate(oitem.keyh)
 
 	if ocount < vcount {
+		fmt.Println("Add ocount < vcount / old item -> ", oitem.value)
 		return
 	}
 
-	t.onEvict(oitem.value)
-
+	fmt.Println("Add final slru.add / old item -> ", oitem.value)
 	t.slru.add(oitem)
 }
