@@ -105,8 +105,6 @@ func (t *T) Add(key string, val interface{}) {
 		return
 	}
 
-	t.onEvict(oitem.value)
-
 	// estimate count of what will be evicted from slru
 	victim := t.slru.victim()
 	if victim == nil {
@@ -124,6 +122,8 @@ func (t *T) Add(key string, val interface{}) {
 	if ocount < vcount {
 		return
 	}
+
+	t.onEvict(oitem.value)
 
 	t.slru.add(oitem)
 }
