@@ -6,6 +6,7 @@ package tinylfu
 
 import (
 	"container/list"
+
 	"github.com/dgryski/go-metro"
 )
 
@@ -17,19 +18,26 @@ type T struct {
 	lru     *lruCache
 	slru    *slruCache
 	data    map[string]*list.Element
+	onEvict func(interface{})
 }
 
-func New(size int, samples int) *T {
+type Config struct {
+	Size    int
+	Samples int
+	OnEvict func(interface{})
+}
+
+func New(cfg Config) *T {
 
 	const lruPct = 1
 
-	lruSize := (lruPct * size) / 100
+	lruSize := (lruPct * cfg.Size) / 100
 	if lruSize < 1 {
 		lruSize = 1
 	}
-	slruSize := int(float64(size) * ((100.0 - lruPct) / 100.0))
+	slruSize := int(float64(cfg.Size) * ((100.0 - lruPct) / 100.0))
 	if slruSize < 1 {
-		slruSize  = 1
+		slruSize = 1
 
 	}
 	slru20 := int(0.2 * float64(slruSize))
@@ -37,18 +45,24 @@ func New(size int, samples int) *T {
 		slru20 = 1
 	}
 
-	data := make(map[string]*list.Element, size)
+	data := make(map[string]*list.Element, cfg.Size)
+	onEvict := cfg.OnEvict
+	if onEvict == nil {
+		onEvict = func(interface{}) {}
+	}
 
 	return &T{
-		c:       newCM4(size),
+		c:       newCM4(cfg.Size),
 		w:       0,
-		samples: samples,
-		bouncer: newDoorkeeper(samples, 0.01),
+		samples: cfg.Samples,
+		bouncer: newDoorkeeper(cfg.Samples, 0.01),
 
 		data: data,
 
 		lru:  newLRU(lruSize, data),
 		slru: newSLRU(slru20, slruSize-slru20, data),
+
+		onEvict: onEvict,
 	}
 }
 
@@ -90,6 +104,8 @@ func (t *T) Add(key string, val interface{}) {
 	if !evicted {
 		return
 	}
+
+	t.onEvict(oitem.value)
 
 	// estimate count of what will be evicted from slru
 	victim := t.slru.victim()
